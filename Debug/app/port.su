@@ -1,0 +1,8 @@
+../app/port.c:14:6:HAL_SPI_TxRxCpltCallback	24	static
+../app/port.c:30:6:HAL_GPIO_EXTI_Callback	16	static
+../app/port.c:39:6:port_register_radio_cb	16	static
+../app/port.c:45:6:spi_init	16	static
+../app/port.c:50:9:spi_write_reg	16	static
+../app/port.c:68:9:spi_read_reg	16	static
+../app/port.c:89:9:spi_write_reg_burst	16	static
+../app/port.c:111:9:spi_read_reg_burst	16	static
