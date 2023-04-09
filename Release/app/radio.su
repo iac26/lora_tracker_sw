@@ -1,0 +1,12 @@
+../app/radio.c:306:6:radio_isr_handler	16	static
+../app/radio.c:75:6:radio_set_idle	8	static
+../app/radio.c:80:6:radio_set_rx	8	static
+../app/radio.c:86:6:radio_set_tx	8	static
+../app/radio.c:93:6:radio_set_tx_power	8	static
+../app/radio.c:119:6:radio_set_frequency	8	static
+../app/radio.c:127:6:radio_set_preamble_len	8	static
+../app/radio.c:132:6:radio_set_modem_params	24	static
+../app/radio.c:33:9:radio_init	32	static
+../app/radio.c:232:9:radio_transmit	24	static
+../app/radio.c:263:9:radio_receive	40	static
+../app/radio.c:347:6:radio_thread	32	static
