@@ -326,12 +326,12 @@ typedef struct radio_packet {
 	uint8_t hop_count;
 	uint8_t sat_count;
 	uint16_t padding;
-	int32_t longitude;
-	int32_t latitude;
-	int32_t hdop;
-	int32_t altitude;
-	int32_t bearing;
-	int32_t velocity;
+	float longitude;
+	float latitude;
+	float hdop;
+	float altitude;
+	float bearing;
+	float velocity;
 }radio_packet_t;
 
 

@@ -2,6 +2,7 @@
 #include <port.h>
 #include <cmsis_os.h>
 #include <spi.h>
+#include <usart.h>
 #include <main.h>
 #include <string.h>
 
@@ -164,31 +165,55 @@ static StaticSemaphore_t uart_sem_buffer;
 
 
 static uint8_t rx_buffer[256];
-
+static uint8_t rx_offset;
 
 
 
 
 void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart) {
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 	if(huart->Instance == huart2.Instance) {
-
+		rx_offset = 0;
+		xSemaphoreGiveFromISR(uart_sem, &xHigherPriorityTaskWoken);
 	}
+	portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 	if(huart->Instance == huart2.Instance) {
-
+		rx_offset = UART_PING_PONG_SIZE/2;
+		xSemaphoreGiveFromISR(uart_sem, &xHigherPriorityTaskWoken);
 	}
+	portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
 }
+
+
 
 
 void uart_init(void) {
 	uart_sem = xSemaphoreCreateBinaryStatic(&uart_sem_buffer);
 
+	//DMA is configured circular
 	HAL_UART_Receive_DMA(&huart2, rx_buffer, UART_PING_PONG_SIZE);
-
-
 }
+
+
+error_t uart_wait(uint16_t timeout) {
+	if(xSemaphoreTake( uart_sem, ( TickType_t ) timeout ) == pdTRUE ) {
+		return e_success;
+	} else {
+		return e_failure;
+	}
+}
+
+uint16_t uart_get_buffer(uint8_t ** buffer) {
+	*buffer = rx_buffer + rx_offset;
+	return UART_PING_PONG_SIZE/2;
+}
+
+
+
 
 
 

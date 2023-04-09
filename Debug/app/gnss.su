@@ -1,1 +1,6 @@
-../app/gnss.c:5:6:gnss_thread	0	static
+../app/gnss.c:9:7:read_lat	16	static
+../app/gnss.c:17:7:read_lon	16	static
+../app/gnss.c:25:6:gnss_decode_gga	16	static
+../app/gnss.c:70:6:gnss_decode_rmc	8	static
+../app/gnss.c:110:6:gnss_handle_fragment	32	static
+../app/gnss.c:163:6:gnss_thread	0	static

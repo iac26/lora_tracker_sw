@@ -46,6 +46,8 @@ void init(void) {
 
 	spi_init();
 
+	uart_init();
+
 
 	INIT_THREAD_CREATE(radio_handle, radio, radio_thread, NULL, RADIO_SZ, RADIO_PRIO);
 
