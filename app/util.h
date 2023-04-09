@@ -7,6 +7,7 @@
 typedef enum {
 	e_success,
 	e_failure,
+	e_timeout
 }error_t;
 
 

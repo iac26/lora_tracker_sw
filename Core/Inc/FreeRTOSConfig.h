@@ -52,7 +52,7 @@
   #include <stdint.h>
   extern uint32_t SystemCoreClock;
 #endif
-#define configENABLE_FPU                         1
+#define configENABLE_FPU                         0
 #define configENABLE_MPU                         0
 
 #define configUSE_PREEMPTION                     1
@@ -66,8 +66,8 @@
 #define configMINIMAL_STACK_SIZE                 ((uint16_t)128)
 #define configMAX_TASK_NAME_LEN                  ( 16 )
 #define configUSE_16_BIT_TICKS                   0
-#define configUSE_MUTEXES                        1
 #define configQUEUE_REGISTRY_SIZE                8
+#define configENABLE_BACKWARD_COMPATIBILITY      0
 #define configUSE_PORT_OPTIMISED_TASK_SELECTION  0
 /* USER CODE BEGIN MESSAGE_BUFFER_LENGTH_TYPE */
 /* Defaults to size_t for backward compatibility, but can be changed
@@ -81,14 +81,15 @@
 
 /* Set the following definitions to 1 to include the API function, or zero
 to exclude the API function. */
-#define INCLUDE_vTaskPrioritySet             1
-#define INCLUDE_uxTaskPriorityGet            1
-#define INCLUDE_vTaskDelete                  1
+#define INCLUDE_vTaskPrioritySet             0
+#define INCLUDE_uxTaskPriorityGet            0
+#define INCLUDE_vTaskDelete                  0
 #define INCLUDE_vTaskCleanUpResources        0
-#define INCLUDE_vTaskSuspend                 1
-#define INCLUDE_vTaskDelayUntil              1
+#define INCLUDE_vTaskSuspend                 0
+#define INCLUDE_vTaskDelayUntil              0
 #define INCLUDE_vTaskDelay                   1
 #define INCLUDE_xTaskGetSchedulerState       1
+#define INCLUDE_xTaskResumeFromISR           0
 
 /* Normal assert() semantics without relying on the provision of an assert.h
 header file. */

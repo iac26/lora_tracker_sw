@@ -6,6 +6,9 @@
 #include <string.h>
 
 
+
+/* SPI */
+
 static SemaphoreHandle_t spi_sem = NULL;
 static StaticSemaphore_t spi_sem_buffer;
 
@@ -24,6 +27,176 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
 }
 
 
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
+
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+	if(hspi->Instance == hspi1.Instance) {
+		xSemaphoreGiveFromISR(spi_sem, &xHigherPriorityTaskWoken);
+	}
+
+	portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
+
+}
+
+void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi) {
+
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+	if(hspi->Instance == hspi1.Instance) {
+		xSemaphoreGiveFromISR(spi_sem, &xHigherPriorityTaskWoken);
+	}
+
+	portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
+
+}
+
+
+
+void spi_init() {
+	spi_sem = xSemaphoreCreateBinaryStatic(&spi_sem_buffer);
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+}
+
+error_t spi_write_reg(uint8_t addr, uint8_t data) {
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+	static uint8_t tx_data[2];
+	tx_data[0] = addr | 0x80; //write mode
+	tx_data[1] = data;
+	HAL_SPI_Transmit_IT(&hspi1, tx_data, 2);
+	//wait for done
+	if(xSemaphoreTake( spi_sem, ( TickType_t ) 10 ) == pdTRUE ) {
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+		return e_success;
+	} else {
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+		return e_failure;
+	}
+}
+
+
+error_t spi_read_reg(uint8_t addr, uint8_t * data) {
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+	HAL_SPI_Transmit_IT(&hspi1, &addr, 1);
+	//wait for tx done
+	if(xSemaphoreTake( spi_sem, ( TickType_t ) 10 ) == pdTRUE ) {
+		HAL_SPI_Receive_IT(&hspi1, data, 1);
+	} else {
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+		return e_failure;
+	}
+	//wait for rx done
+	if(xSemaphoreTake( spi_sem, ( TickType_t ) 10 ) == pdTRUE ) {
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+		return e_success;
+	} else {
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+		return e_failure;
+	}
+}
+
+/*
+ * Max data size 4 bytes
+ */
+error_t spi_write_reg_burst(uint8_t addr, uint8_t * data, uint8_t len) {
+	if(len <= MAX_SPI_PACKET) {
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+		uint8_t wr_addr = addr | 0x80; //write mode
+		HAL_SPI_Transmit_IT(&hspi1, &wr_addr, 1);
+		//wait for tx addr done
+		if(xSemaphoreTake( spi_sem, ( TickType_t ) 10 ) == pdTRUE ) {
+			HAL_SPI_Transmit_DMA(&hspi1, data, len);
+		} else {
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+			return e_failure;
+		}
+		//wait for done
+		if(xSemaphoreTake( spi_sem, ( TickType_t ) 10 ) == pdTRUE ) {
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+			return e_success;
+		} else {
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+			return e_failure;
+		}
+	} else {
+		return e_failure;
+	}
+}
+
+
+error_t spi_read_reg_burst(uint8_t addr, uint8_t * data, uint8_t len) {
+	if(len <= MAX_SPI_PACKET) {
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+		HAL_SPI_Transmit_IT(&hspi1, &addr, 1);
+		//wait for tx done
+		if(xSemaphoreTake( spi_sem, ( TickType_t ) 10 ) == pdTRUE ) {
+			HAL_SPI_Receive_DMA(&hspi1, data, len);
+		} else {
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+			return e_failure;
+		}
+		//wait for rx done
+		if(xSemaphoreTake( spi_sem, ( TickType_t ) 10 ) == pdTRUE ) {
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+			return e_success;
+		} else {
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+			return e_failure;
+		}
+	} else {
+		return e_failure;
+	}
+}
+
+
+
+
+/* UART */
+/*
+ * DMA ping pong reception
+ */
+
+
+static SemaphoreHandle_t uart_sem = NULL;
+static StaticSemaphore_t uart_sem_buffer;
+
+#define UART_PING_PONG_SIZE 256
+
+
+static uint8_t rx_buffer[256];
+
+
+
+
+
+void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart) {
+	if(huart->Instance == huart2.Instance) {
+
+	}
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	if(huart->Instance == huart2.Instance) {
+
+	}
+}
+
+
+void uart_init(void) {
+	uart_sem = xSemaphoreCreateBinaryStatic(&uart_sem_buffer);
+
+	HAL_UART_Receive_DMA(&huart2, rx_buffer, UART_PING_PONG_SIZE);
+
+
+}
+
+
+
+
+
+
+/* EXTI */
+
 static void (*radio_cb)(void) = NULL;
 
 
@@ -41,90 +214,3 @@ void port_register_radio_cb(void (*cb)(void)) {
 }
 
 
-
-void spi_init() {
-	spi_sem = xSemaphoreCreateBinaryStatic(&spi_sem_buffer);
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
-}
-
-error_t spi_write_reg(uint8_t addr, uint8_t data) {
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
-	static uint8_t tx_data[2];
-	static uint8_t rx_data[2];
-	tx_data[0] = addr | 0x80; //write mode
-	tx_data[1] = data;
-	HAL_SPI_TransmitReceive_IT(&hspi1, tx_data, rx_data, 2);
-	//wait for done
-	if(xSemaphoreTake( spi_sem, ( TickType_t ) 10 ) == pdTRUE ) {
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
-		return e_success;
-	} else {
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
-		return e_failure;
-	}
-}
-
-
-error_t spi_read_reg(uint8_t addr, uint8_t * data) {
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
-	static uint8_t tx_data[2];
-	static uint8_t rx_data[2];
-	tx_data[0] = addr;
-	tx_data[1] = 0x00;
-	HAL_SPI_TransmitReceive_IT(&hspi1, tx_data, rx_data, 2);
-	//wait for done
-	if(xSemaphoreTake( spi_sem, ( TickType_t ) 10 ) == pdTRUE ) {
-		*data = rx_data[1];
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
-		return e_success;
-	} else {
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
-		return e_failure;
-	}
-}
-
-/*
- * Max data size 4 bytes
- */
-error_t spi_write_reg_burst(uint8_t addr, uint8_t * data, uint8_t len) {
-	static uint8_t tx_data[MAX_SPI_PACKET+1];
-	static uint8_t rx_data[MAX_SPI_PACKET+1];
-	tx_data[0] = addr | 0x80; //write mode
-	if(len <= MAX_SPI_PACKET) {
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
-		memcpy(tx_data+1, data, len);
-		HAL_SPI_TransmitReceive_IT(&hspi1, tx_data, rx_data, len);
-		//wait for done
-		if(xSemaphoreTake( spi_sem, ( TickType_t ) 10 ) == pdTRUE ) {
-			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
-			return e_success;
-		} else {
-			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
-			return e_failure;
-		}
-	} else {
-		return e_failure;
-	}
-}
-
-
-error_t spi_read_reg_burst(uint8_t addr, uint8_t * data, uint8_t len) {
-	static uint8_t tx_data[MAX_SPI_PACKET+1];
-	static uint8_t rx_data[MAX_SPI_PACKET+1];
-	tx_data[0] = addr;
-	if(len <= MAX_SPI_PACKET) {
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
-		HAL_SPI_TransmitReceive_IT(&hspi1, tx_data, rx_data, len);
-		//wait for done
-		if(xSemaphoreTake( spi_sem, ( TickType_t ) 10 ) == pdTRUE ) {
-			memcpy(data, rx_data+1, len);
-			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
-			return e_success;
-		} else {
-			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
-			return e_failure;
-		}
-	} else {
-		return e_failure;
-	}
-}

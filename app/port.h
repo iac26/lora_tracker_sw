@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <util.h>
 
-#define MAX_SPI_PACKET 128
+#define MAX_SPI_PACKET 256
 
 void spi_init();
 

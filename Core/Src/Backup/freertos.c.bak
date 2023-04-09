@@ -100,6 +100,8 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
+
+#ifdef SOMETHING
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -109,6 +111,7 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
+#endif
   /* USER CODE END RTOS_THREADS */
 
 }

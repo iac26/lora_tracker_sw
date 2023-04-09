@@ -2,6 +2,7 @@
 #include <cmsis_os.h>
 #include <init.h>
 #include <radio.h>
+#include <gnss.h>
 #include <port.h>
 
 
@@ -31,10 +32,14 @@
 
 
 
-#define RADIO_SZ		1024
+#define RADIO_SZ	256
 #define RADIO_PRIO	(6)
 
+#define GNSS_SZ		256
+#define GNSS_PRIO	(5)
+
 static TaskHandle_t radio_handle = NULL;
+static TaskHandle_t gnss_handle = NULL;
 
 void init(void) {
 
@@ -43,6 +48,9 @@ void init(void) {
 
 
 	INIT_THREAD_CREATE(radio_handle, radio, radio_thread, NULL, RADIO_SZ, RADIO_PRIO);
+
+	INIT_THREAD_CREATE(gnss_handle, gnss, gnss_thread, NULL, GNSS_SZ, GNSS_PRIO);
+
 }
 
 

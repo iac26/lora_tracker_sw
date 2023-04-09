@@ -16,7 +16,8 @@ app/init.o: ../app/init.c \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/queue.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/event_groups.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h \
- ../app/init.h ../app/radio.h ../app/util.h ../app/port.h ../app/util.h
+ ../app/init.h ../app/radio.h ../app/util.h ../app/gnss.h ../app/port.h \
+ ../app/util.h
 ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS/cmsis_os.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h:
 ../Core/Inc/FreeRTOSConfig.h:
@@ -37,5 +38,6 @@ app/init.o: ../app/init.c \
 ../app/init.h:
 ../app/radio.h:
 ../app/util.h:
+../app/gnss.h:
 ../app/port.h:
 ../app/util.h:

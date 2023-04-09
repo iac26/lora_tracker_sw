@@ -1,6 +1,8 @@
 #include <radio.h>
 #include <port.h>
+#include <main.h>
 #include <cmsis_os.h>
+#include <stdlib.h>
 
 
 
@@ -62,7 +64,7 @@ error_t radio_init() {
 
 	radio_set_frequency(868);
 
-	radio_set_tx_power(20);
+	radio_set_tx_power(13);
 
 
 	return e_success;
@@ -227,7 +229,6 @@ void radio_set_modem_params(radio_config_t cfg) {
 
 
 
-
 error_t radio_transmit(uint8_t * data, uint16_t len) {
 	if (len > MAX_PACKET_LEN) {
 		return e_failure;
@@ -257,8 +258,53 @@ error_t radio_transmit(uint8_t * data, uint16_t len) {
 	}
 
 	return e_success;
+}
+
+error_t radio_receive(uint8_t * data, uint16_t * plen, uint16_t timeout) {
+	if (*plen > MAX_PACKET_LEN) {
+		return e_failure;
+	}
+
+	radio_set_rx();
+
+	if(xSemaphoreTake( radio_isr_sem, ( TickType_t ) timeout ) == pdTRUE ) {
+
+		uint8_t irq_flags;
+		spi_read_reg(RH_RF95_REG_12_IRQ_FLAGS, &irq_flags);
 
 
+		spi_write_reg(RH_RF95_REG_12_IRQ_FLAGS, 0xff); // Clear all IRQ flags
+
+		if((irq_flags & (RH_RF95_RX_TIMEOUT | RH_RF95_PAYLOAD_CRC_ERROR))) {
+			//bad packet
+			radio_set_idle();
+			return e_failure;
+		} else if(irq_flags & RH_RF95_RX_DONE) {
+			//good packet
+			uint8_t packet_len;
+			spi_read_reg(RH_RF95_REG_13_RX_NB_BYTES, &packet_len);
+
+			// Reset the fifo read ptr to the beginning of the packet
+			uint8_t current_fifo_address;
+			spi_read_reg(RH_RF95_REG_10_FIFO_RX_CURRENT_ADDR, &current_fifo_address);
+			spi_write_reg(RH_RF95_REG_0D_FIFO_ADDR_PTR, current_fifo_address);
+			if(packet_len > *plen) {
+				//packet too long
+				radio_set_idle();
+				return e_failure;
+			}
+			spi_read_reg_burst(RH_RF95_REG_00_FIFO, data, packet_len);
+			*plen = packet_len;
+			radio_set_idle();
+			return e_success;
+		}
+
+	} else {
+		radio_set_idle();
+		return e_timeout;
+	}
+	radio_set_idle();
+	return e_failure;
 }
 
 
@@ -272,27 +318,104 @@ void radio_isr_handler(void) {
 
 
 
+#define CALLSIGN ('R' << 0 | 'F' << 8 | 'B' << 16 | 'G' << 24)
+
+typedef struct radio_packet {
+	uint32_t callsign; //RFGB
+	uint32_t packet_id; // sourceID + PacketID
+	uint8_t hop_count;
+	uint8_t sat_count;
+	uint16_t padding;
+	int32_t longitude;
+	int32_t latitude;
+	int32_t hdop;
+	int32_t altitude;
+	int32_t bearing;
+	int32_t velocity;
+}radio_packet_t;
+
+
+
+#define PACKET_HISTORY 100
+
+static struct tracker_data {
+	uint8_t tracker_id;
+	uint32_t packet_count;
+	uint32_t packet_list[PACKET_HISTORY];
+	uint32_t packet_pointer;
+
+} tracker_data = {0};
+
+
+
+void radio_store_packet(uint32_t packet_id) {
+	tracker_data.packet_list[tracker_data.packet_pointer++] = packet_id; //store packet in database
+	if(tracker_data.packet_pointer >= PACKET_HISTORY) {
+		tracker_data.packet_pointer = 0;
+	}
+}
+
+
 
 void radio_thread(void * arg) {
 
 
 	radio_init();
 
+	//read hardware board ID
+	tracker_data.tracker_id = GPIOB->IDR | 0x0F;
+
+	srand(tracker_data.tracker_id);
+
 
 
 
 	for(;;) {
 
-		static uint8_t data[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+		static radio_packet_t tx_packet = {
+				.callsign = CALLSIGN,
+				.hop_count = 0
+		};
 
-		radio_transmit(data, 10);
+		tx_packet.packet_id = tracker_data.tracker_id | tracker_data.packet_count++ << 8;
 
+		radio_store_packet(tx_packet.packet_id);
 
+		radio_transmit((uint8_t *) &tx_packet, sizeof(radio_packet_t));
 
-		osDelay(5000);
+		 //timer between 2 and 5 minutes
+		int32_t rx_timer = (int64_t)rand()*18000 / RAND_MAX + 12000;
+		while(rx_timer > 0) {
+			uint32_t time = HAL_GetTick();
+			static radio_packet_t rx_packet;
+			uint16_t size = sizeof(radio_packet_t);
+			if(radio_receive((uint8_t *)&rx_packet, &size, rx_timer) == e_success) {
+				//packet received
+				if(rx_packet.callsign == CALLSIGN) {
+					//valid packet
 
+					//check if packet is known
+					for (uint32_t i = 0; i < PACKET_HISTORY; i++) {
+						if(rx_packet.packet_id == tracker_data.packet_list[i]) {
+							//known packet -> discard
+							break;
+						} else {
+							//unknown packet -> repeat
+							rx_packet.hop_count += 1;
+							radio_store_packet(rx_packet.packet_id);
+							radio_transmit((uint8_t *)&rx_packet, sizeof(radio_packet_t));
+						}
+					}
+				}
+			} else {
+				//some other condition (stray packet, timeout, error)
+			}
+			time = HAL_GetTick() - time;
+			rx_timer -= time;
+		}
 	}
 }
+
 
 
 
