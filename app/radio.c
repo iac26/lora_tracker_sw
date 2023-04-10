@@ -515,10 +515,10 @@ void radio_gs_thread(void * arg) {
 					uint16_t len = sprintf(msg, "$p,%ld,%ld,%d,%d,",
 							rx_packet.packet_id >> 24, rx_packet.packet_id&0xffffff, rx_packet.hop_count, rx_packet.bat_level);
 					lpuart_send(msg, len);
-					ftoa(rx_packet.longitude, num, 6);
+					ftoa(rx_packet.latitude, num, 6);
 					len = sprintf(msg, "%s,", num);
 					lpuart_send(msg, len);
-					ftoa(rx_packet.latitude, num, 6);
+					ftoa(rx_packet.longitude, num, 6);
 					len = sprintf(msg, "%s,", num);
 					lpuart_send(msg, len);
 					ftoa(rx_packet.hdop, num, 3);

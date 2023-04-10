@@ -15140,11 +15140,11 @@ void radio_gs_thread(void * arg) {
  8005bfa:	b281      	uxth	r1, r0
  8005bfc:	0020      	movs	r0, r4
  8005bfe:	f7ff fdf7 	bl	80057f0 <lpuart_send>
-					ftoa(rx_packet.longitude, num, 6);
+					ftoa(rx_packet.latitude, num, 6);
  8005c02:	4d31      	ldr	r5, [pc, #196]	; (8005cc8 <radio_gs_thread+0x120>)
  8005c04:	2206      	movs	r2, #6
  8005c06:	0029      	movs	r1, r5
- 8005c08:	68f0      	ldr	r0, [r6, #12]
+ 8005c08:	6930      	ldr	r0, [r6, #16]
  8005c0a:	f7ff ff91 	bl	8005b30 <ftoa>
 					len = sprintf(msg, "%s,", num);
  8005c0e:	4f2f      	ldr	r7, [pc, #188]	; (8005ccc <radio_gs_thread+0x124>)
@@ -15156,10 +15156,10 @@ void radio_gs_thread(void * arg) {
  8005c1a:	b281      	uxth	r1, r0
  8005c1c:	0020      	movs	r0, r4
  8005c1e:	f7ff fde7 	bl	80057f0 <lpuart_send>
-					ftoa(rx_packet.latitude, num, 6);
+					ftoa(rx_packet.longitude, num, 6);
  8005c22:	2206      	movs	r2, #6
  8005c24:	0029      	movs	r1, r5
- 8005c26:	6930      	ldr	r0, [r6, #16]
+ 8005c26:	68f0      	ldr	r0, [r6, #12]
  8005c28:	f7ff ff82 	bl	8005b30 <ftoa>
 					len = sprintf(msg, "%s,", num);
  8005c2c:	002a      	movs	r2, r5
