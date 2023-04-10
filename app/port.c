@@ -5,6 +5,7 @@
 #include <usart.h>
 #include <main.h>
 #include <string.h>
+#include <init.h>
 
 
 
@@ -106,7 +107,7 @@ error_t spi_write_reg_burst(uint8_t addr, uint8_t * data, uint8_t len) {
 		HAL_SPI_Transmit_IT(&hspi1, &wr_addr, 1);
 		//wait for tx addr done
 		if(xSemaphoreTake( spi_sem, ( TickType_t ) 10 ) == pdTRUE ) {
-			HAL_SPI_Transmit_DMA(&hspi1, data, len);
+			HAL_SPI_Transmit_IT(&hspi1, data, len);
 		} else {
 			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
 			return e_failure;
@@ -131,7 +132,7 @@ error_t spi_read_reg_burst(uint8_t addr, uint8_t * data, uint8_t len) {
 		HAL_SPI_Transmit_IT(&hspi1, &addr, 1);
 		//wait for tx done
 		if(xSemaphoreTake( spi_sem, ( TickType_t ) 10 ) == pdTRUE ) {
-			HAL_SPI_Receive_DMA(&hspi1, data, len);
+			HAL_SPI_Receive_IT(&hspi1, data, len);
 		} else {
 			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
 			return e_failure;
@@ -158,49 +159,42 @@ error_t spi_read_reg_burst(uint8_t addr, uint8_t * data, uint8_t len) {
  */
 
 
+#if GROUND_STATION == 0
+
 static SemaphoreHandle_t uart_sem = NULL;
 static StaticSemaphore_t uart_sem_buffer;
 
-#define UART_PING_PONG_SIZE 256
+#define UART_PING_PONG_SIZE 64
 
 
-static uint8_t rx_buffer[256];
-static uint8_t rx_offset;
+static uint8_t rx_buffer[2][UART_PING_PONG_SIZE];
+static uint8_t rx_offset = 0;
 
 
 
-
-void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart) {
-	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-	if(huart->Instance == huart2.Instance) {
-		rx_offset = 0;
-		xSemaphoreGiveFromISR(uart_sem, &xHigherPriorityTaskWoken);
-	}
-	portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
-}
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 	if(huart->Instance == huart2.Instance) {
-		rx_offset = UART_PING_PONG_SIZE/2;
 		xSemaphoreGiveFromISR(uart_sem, &xHigherPriorityTaskWoken);
 	}
 	portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
 }
-
 
 
 
 void uart_init(void) {
 	uart_sem = xSemaphoreCreateBinaryStatic(&uart_sem_buffer);
 
-	//DMA is configured circular
-	HAL_UART_Receive_DMA(&huart2, rx_buffer, UART_PING_PONG_SIZE);
+	//DMA is configured normal
+	HAL_UART_Receive_IT(&huart2, rx_buffer[rx_offset], UART_PING_PONG_SIZE);
 }
 
 
 error_t uart_wait(uint16_t timeout) {
 	if(xSemaphoreTake( uart_sem, ( TickType_t ) timeout ) == pdTRUE ) {
+		rx_offset = !rx_offset;
+		HAL_UART_Receive_IT(&huart2, rx_buffer[rx_offset], UART_PING_PONG_SIZE);
 		return e_success;
 	} else {
 		return e_failure;
@@ -208,14 +202,20 @@ error_t uart_wait(uint16_t timeout) {
 }
 
 uint16_t uart_get_buffer(uint8_t ** buffer) {
-	*buffer = rx_buffer + rx_offset;
-	return UART_PING_PONG_SIZE/2;
+	*buffer = rx_buffer[rx_offset];
+	return UART_PING_PONG_SIZE;
 }
 
+#endif
 
 
 
+/* LPUART */
 
+
+void lpuart_send(char * data, uint16_t len) {
+	HAL_UART_Transmit(&hlpuart1, data, len, 100);
+}
 
 
 

@@ -3,6 +3,11 @@
 #include <main.h>
 #include <cmsis_os.h>
 #include <stdlib.h>
+#include <gnss.h>
+#include <adc.h>
+#include <stdio.h>
+#include <init.h>
+#include <math.h>
 
 
 
@@ -52,7 +57,7 @@ error_t radio_init() {
 	spi_write_reg(RH_RF95_REG_01_OP_MODE, RH_RF95_MODE_STDBY);
 
 	radio_config_t cfg = {
-		.bw = BW_125KHZ,
+		.bw = BW_250KHZ,
 		.cr = CR_4_8,
 		.sf = 8
 	};
@@ -324,7 +329,7 @@ typedef struct radio_packet {
 	uint32_t callsign; //RFGB
 	uint32_t packet_id; // sourceID + PacketID
 	uint8_t hop_count;
-	uint8_t sat_count;
+	uint8_t bat_level;
 	uint16_t padding;
 	float longitude;
 	float latitude;
@@ -355,7 +360,9 @@ void radio_store_packet(uint32_t packet_id) {
 	}
 }
 
+#if GROUND_STATION == 0
 
+static uint32_t bat_level;
 
 void radio_thread(void * arg) {
 
@@ -363,12 +370,9 @@ void radio_thread(void * arg) {
 	radio_init();
 
 	//read hardware board ID
-	tracker_data.tracker_id = GPIOB->IDR | 0x0F;
+	tracker_data.tracker_id = GPIOB->IDR & 0x0F;
 
 	srand(tracker_data.tracker_id);
-
-
-
 
 	for(;;) {
 
@@ -377,7 +381,15 @@ void radio_thread(void * arg) {
 				.hop_count = 0
 		};
 
-		tx_packet.packet_id = tracker_data.tracker_id | tracker_data.packet_count++ << 8;
+		gnss_data_t gnss_data = gnss_get_data();
+
+		tx_packet.longitude = gnss_data.longitude;
+		tx_packet.latitude = gnss_data.latitude;
+		tx_packet.hdop = gnss_data.hdop;
+		tx_packet.velocity = gnss_data.speed;
+		tx_packet.bat_level = (uint32_t)bat_level * 60 / 4096;
+
+		tx_packet.packet_id = tracker_data.tracker_id << 24 | tracker_data.packet_count++;
 
 		radio_store_packet(tx_packet.packet_id);
 
@@ -385,6 +397,7 @@ void radio_thread(void * arg) {
 
 		 //timer between 2 and 5 minutes
 		int32_t rx_timer = (int64_t)rand()*18000 / RAND_MAX + 12000;
+		HAL_ADC_Start_DMA(&hadc, &bat_level, 1);
 		while(rx_timer > 0) {
 			uint32_t time = HAL_GetTick();
 			static radio_packet_t rx_packet;
@@ -393,18 +406,21 @@ void radio_thread(void * arg) {
 				//packet received
 				if(rx_packet.callsign == CALLSIGN) {
 					//valid packet
-
+					uint8_t known_packet = 0;
 					//check if packet is known
 					for (uint32_t i = 0; i < PACKET_HISTORY; i++) {
 						if(rx_packet.packet_id == tracker_data.packet_list[i]) {
 							//known packet -> discard
+							known_packet = 1;
 							break;
-						} else {
-							//unknown packet -> repeat
-							rx_packet.hop_count += 1;
-							radio_store_packet(rx_packet.packet_id);
-							radio_transmit((uint8_t *)&rx_packet, sizeof(radio_packet_t));
 						}
+					}
+					if(known_packet == 0) {
+						//unknown packet -> repeat
+						rx_packet.hop_count += 1;
+						radio_store_packet(rx_packet.packet_id);
+						osDelay(rx_timer/10000); //wait 100ms
+						radio_transmit((uint8_t *)&rx_packet, sizeof(radio_packet_t));
 					}
 				}
 			} else {
@@ -416,9 +432,116 @@ void radio_thread(void * arg) {
 	}
 }
 
+#else
+
+/*
+	uint32_t callsign; //RFGB
+	uint32_t packet_id; // sourceID + PacketID
+	uint8_t hop_count;
+	uint8_t bat_level;
+	uint16_t padding;
+	float longitude;
+	float latitude;
+	float hdop;
+	float altitude;
+	float bearing;
+	float velocity;
+*/
+
+/* GS stuff */
+
+void reverse(char* str, int len)
+{
+    int i = 0, j = len - 1, temp;
+    while (i < j) {
+        temp = str[i];
+        str[i] = str[j];
+        str[j] = temp;
+        i++;
+        j--;
+    }
+}
 
 
+int intToStr(int x, char str[], int d)
+{
+    int i = 0;
+    while (x) {
+        str[i++] = (x % 10) + '0';
+        x = x / 10;
+    }
+    while (i < d)
+        str[i++] = '0';
 
+    reverse(str, i);
+    str[i] = '\0';
+    return i;
+}
+
+
+uint16_t ftoa(float n, char* res, int afterpoint)
+{
+    int ipart = (int)n;
+    float fpart = n - (float)ipart;
+    int i = intToStr(ipart, res, 0);
+
+    if (afterpoint != 0) {
+        res[i] = '.';
+
+        fpart = fpart * pow(10, afterpoint);
+
+        i += intToStr((int)fpart, res + i + 1, afterpoint);
+    }
+
+    return i;
+}
+
+void radio_gs_thread(void * arg) {
+	radio_init();
+
+	static char msg1[64];
+
+	uint16_t len1 = sprintf(msg1, "#BS Tracker GS, Iacopo Sprenger\r\n");
+	lpuart_send(msg1, len1);
+
+	for(;;) {
+		static radio_packet_t rx_packet;
+		uint16_t size = sizeof(radio_packet_t);
+		if(radio_receive((uint8_t *)&rx_packet, &size, 0xffff) == e_success) {
+				//packet received
+				if(rx_packet.callsign == CALLSIGN) {
+					static char msg[128];
+					static char num[32];
+					uint16_t len = sprintf(msg, "$p,%ld,%ld,%d,%d,",
+							rx_packet.packet_id >> 24, rx_packet.packet_id&0xffffff, rx_packet.hop_count, rx_packet.bat_level);
+					lpuart_send(msg, len);
+					ftoa(rx_packet.longitude, num, 6);
+					len = sprintf(msg, "%s,", num);
+					lpuart_send(msg, len);
+					ftoa(rx_packet.latitude, num, 6);
+					len = sprintf(msg, "%s,", num);
+					lpuart_send(msg, len);
+					ftoa(rx_packet.hdop, num, 3);
+					len = sprintf(msg, "%s,", num);
+					lpuart_send(msg, len);
+					ftoa(rx_packet.altitude, num, 3);
+					len = sprintf(msg, "%s,", num);
+					lpuart_send(msg, len);
+					ftoa(rx_packet.bearing, num, 3);
+					len = sprintf(msg, "%s,", num);
+					lpuart_send(msg, len);
+					ftoa(rx_packet.velocity, num, 3);
+					len = sprintf(msg, "%s,\r\n", num);
+					lpuart_send(msg, len);
+
+
+			}
+		}
+	}
+
+}
+
+#endif
 
 
 

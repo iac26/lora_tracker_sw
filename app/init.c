@@ -41,17 +41,27 @@
 static TaskHandle_t radio_handle = NULL;
 static TaskHandle_t gnss_handle = NULL;
 
+
 void init(void) {
 
-
+#if GROUND_STATION == 0
 	spi_init();
 
 	uart_init();
 
 
+
 	INIT_THREAD_CREATE(radio_handle, radio, radio_thread, NULL, RADIO_SZ, RADIO_PRIO);
 
 	INIT_THREAD_CREATE(gnss_handle, gnss, gnss_thread, NULL, GNSS_SZ, GNSS_PRIO);
+
+#else
+	spi_init();
+
+
+	INIT_THREAD_CREATE(radio_handle, radio, radio_gs_thread, NULL, RADIO_SZ, RADIO_PRIO);
+
+#endif
 
 }
 

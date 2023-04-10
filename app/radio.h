@@ -267,6 +267,6 @@ void radio_set_modem_params(radio_config_t cfg);
 
 void radio_thread(void * arg);
 
-
+void radio_gs_thread(void * arg);
 
 #endif

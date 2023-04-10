@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define ACCU_SIZE 128
+#define ACCU_SIZE 64
 #define GNSS_GGA_TIME 1
 #define GNSS_GGA_LATITUDE 2
 #define GNSS_GGA_NS 3
@@ -47,6 +47,7 @@ typedef struct gnss_context {
     uint8_t done;
 } gnss_context_t;
 
+gnss_data_t gnss_get_data(void);
 
 void gnss_thread(void * arg);
 
