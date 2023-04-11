@@ -74,8 +74,21 @@ let tracks = {};
 get_data();
 
 
+function make_ch1903(lat, lon) {
+    let data = Swisstopo.WGStoCH(lat, lon);
+    let x = Math.round(data[0])
+    let x1 = Math.floor(data[0]/1000)
+    x = x - x1*1000;
+    let y = Math.round(data[1])
+    let y1 = Math.floor(data[1]/1000)
+    y= y - y1*1000;
+    return `<p>CH1903+ / LV95: 2'${x1}'${x} / 1'${y1}'${y}</p>`;
+    
+}
+
+
 function make_popup(data) {
-    return `<h4>Tracker ${data["board_id"]}<h4/><p>Batterie: ${data["bat_level"]}</p><p>Coordonnées: ${data["latitude"]}, ${data["longitude"]} (${data["hdop"]})</p><p>Vitesse: ${data["velocity"]}</p><p>Dernier Packet: ${data["time"]}</p>`;
+    return `<h4>Tracker ${data["board_id"]}<h4/><p>Batterie: ${data["bat_level"]} V</p><p>Coordonnées: ${data["latitude"]}, ${data["longitude"]} (${data["hdop"]})</p>${make_ch1903(data["latitude"], data["longitude"])}<p>Vitesse: ${data["velocity"]} m/s</p><p>Dernier Packet: ${data["time"]}</p>`;
 }
 
 

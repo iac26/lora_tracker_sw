@@ -18,6 +18,7 @@
         <div id="map"></div>
         
     </main>
+    <script src="js/wgs84_ch1903.js"></script>
 	<script src="js/index.js"></script>
   </body>
 </html>
