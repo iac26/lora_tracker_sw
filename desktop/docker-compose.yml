@@ -1,0 +1,44 @@
+version: "3"
+services:
+  web:
+    build: ./web
+    ports:
+      - '80:80'
+    volumes:
+      -  ${PWD}/apache:/etc/apache2/sites-enabled
+      -  ${PWD}/html:/var/www/html
+      -  ${PWD}/php/php.ini:/usr/local/etc/php/php.ini
+    depends_on:
+      - mariadb
+    networks:
+      - dev-env
+  phpmyadmin:
+    image: phpmyadmin:latest
+    ports:
+      - 8080:80
+    environment:
+      - PMA_ARBITRARY=1
+      - PMA_HOST=mariadb
+    depends_on:
+      - mariadb
+    volumes:
+      -  ${PWD}/php/php.ini:/usr/local/etc/php/php.ini
+    networks:
+      - dev-env
+  mariadb:
+    image: mariadb:latest
+    environment:
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD}"
+      MYSQL_USER: "${DB_USERNAME}"
+      MYSQL_PASSWORD: "${DB_PASSWORD}"
+      MYSQL_DATABASE: "${DB_NAME}"
+    volumes:
+      - mysqldata:/var/lib/mysql
+    ports:
+      - 3306:3306
+    networks:
+      - dev-env
+volumes:
+  mysqldata:
+networks:
+  dev-env:

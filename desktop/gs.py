@@ -1,6 +1,8 @@
 import serial
 import sys
 import json
+import requests
+
 
 
 
@@ -37,5 +39,8 @@ while (1):
 
 	y = json.dumps(pack)
 	print(y)
+	headers = {'Content-type': 'application/json'}
+	r = requests.post('http://localhost/upload_track.php', data=y, headers=headers)
+	print(f"Status Code: {r.status_code}, Response: {r.text}")
 
 

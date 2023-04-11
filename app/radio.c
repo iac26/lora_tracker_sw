@@ -69,7 +69,7 @@ error_t radio_init() {
 
 	radio_set_frequency(868);
 
-	radio_set_tx_power(13);
+	radio_set_tx_power(23);
 
 
 	return e_success;
